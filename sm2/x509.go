@@ -320,6 +320,7 @@ const (
 	SHA256WithRSAPSS
 	SHA384WithRSAPSS
 	SHA512WithRSAPSS
+	PureEd25519  // 最新的x509包含该算法，加上以进行对齐
 	SM2WithSM3
 	SM2WithSHA1
 	SM2WithSHA256
@@ -1033,7 +1034,7 @@ func checkSignature(algo SignatureAlgorithm, signed, signature []byte, publicKey
 				X:     pub.X,
 				Y:     pub.Y,
 			}
-			if !Sm2Verify(sm2pub, signed, nil, ecdsaSig.R, ecdsaSig.S) {
+			if !Sm2Verify(sm2pub, fnHash(), nil, ecdsaSig.R, ecdsaSig.S) {
 				return errors.New("x509: SM2 verification failure")
 			}
 		default:
@@ -1959,8 +1960,10 @@ func CreateCertificate(rand io.Reader, template, parent *Certificate, pub, priv 
 
 	digest := tbsCertContents
 	switch template.SignatureAlgorithm {
-	case SM2WithSM3, SM2WithSHA1, SM2WithSHA256:
-		break
+	case SM2WithSM3:
+		h := sm3.New()
+		h.Write(tbsCertContents)
+		digest = h.Sum(nil)
 	default:
 		h := hashFunc.New()
 		h.Write(tbsCertContents)
@@ -2353,8 +2356,10 @@ func CreateCertificateRequest(rand io.Reader, template *CertificateRequest, priv
 
 	digest := tbsCSRContents
 	switch template.SignatureAlgorithm {
-	case SM2WithSM3, SM2WithSHA1, SM2WithSHA256:
-		break
+	case SM2WithSM3:
+		h := sm3.New()
+		h.Write(tbsCSRContents)
+		digest = h.Sum(nil)
 	default:
 		h := hashFunc.New()
 		h.Write(tbsCSRContents)
